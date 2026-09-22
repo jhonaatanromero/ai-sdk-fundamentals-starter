@@ -63,6 +63,12 @@ verified and must not be treated as fact.
 | 10 | The starter repo's `main` ships **AI SDK v6**, while the course prose teaches **v7** and `Output.object()`. The v7 upgrade exists in the unmerged branch `chore/upgrade-ai-sdk-v7` (Eve Porcello, 2026-06-30) and **the course never mentions it**. Following the setup lesson literally installs v6 and then applies v7 instructions. Unmerged for ~3 months. | Confirmed → **worked around** |
 | 11 | `package.json` scripts escape parentheses for POSIX shells (`tsx app/\\(1-extraction\\)/extraction.ts`). pnpm on Windows spawns via `cmd.exe`, where `\` is a path separator, not an escape. **`pnpm run extraction` is predicted to fail on Windows.** Workaround: `pnpm tsx "app/(1-extraction)/extraction.ts"`. The v7 branch did not fix this. **Confirmed in Lesson 4**: `pnpm extraction` fails with `/extraction.ts was unexpected at this time.` (exit 255) — a `cmd.exe` parser error, since `(` and `)` are grouping operators there and `\` does not escape them (cmd uses `^`). The quoted direct call works. **Every CLI lesson in this course needs this workaround on Windows.** | Confirmed |
 | 12 | The course prompt says *"Extract all the names mentioned in this essay"* and the model returned **named entities, not person names**: companies (`YC`, `Airbnb`, `Apple`), a place (`Silicon Valley`) and a date (`September 2024`, which is not a name under any reading). "Names" is ambiguous and the model resolved it its own way — a live demonstration of Lesson 2's *"be specific and over-explain"*. The output is also an unparsed comma string, fragile to any name containing a comma. | Confirmed |
+| 13 | Lesson 5's `model-comparison.ts` opens with `import 'dotenv/config'`, which loads **only `.env`**. The key lives in `.env.local`, which only `dotenv-flow` loads — and Lesson 4's `extraction.ts` uses `dotenv-flow`. **The course is internally inconsistent between two consecutive lessons.** Fails with `GatewayAuthenticationError` before spending a token. Fix: use the `dotenv-flow` pattern. | Confirmed |
+| 14 | **The lesson's central demo produces the opposite of its own thesis.** Same prompt, measured twice: `gpt-5-mini` ("fast model") took **31,523 ms**, then **38,077 ms**. `gpt-5.2` ("reasoning model") took **6,071 ms**, then **5,982 ms**. The "fast" model was consistently **5–6× slower**, and the numbers are stable, so this is not a fluke. Latency is not a static property of a model but of the **(model, task difficulty)** pair — the same `gpt-5-mini` answered Lesson 4's extraction almost instantly. The course's advice *"use fast models for chatbots, they respond in under 1 second"* would have left a user watching a blank screen for 38 seconds. | Confirmed |
+| 15 | The comparison script **hardcodes its conclusions as static `console.log` strings** (*"Fast models start responding immediately"*, *"Reasoning models think before responding"*) and bakes the word "slower" into the delta line, so it printed `Speed difference: -32095ms slower for reasoning`. **The demo cannot contradict its lesson no matter what the data says.** An experiment whose result is written before it runs is not an experiment. | Confirmed |
+| 16 | Answer quality inverted too, in the subtler direction. **Both models were correct.** `gpt-5-mini` enumerated **all three** balanced solutions — 13 teams (7×12 + 6×11), 17 teams (3×8 + 14×9), 18 teams (12×8 + 6×9) — verified exhaustive. `gpt-5.2` found only the 13-team one, after asserting *"the closest allowed consecutive sizes are 11 and 12"*, which is false: **8 and 9 are equally close**. So the model that was 6× faster was also **less complete**. Speed and thoroughness traded off in the direction opposite to the lesson's taxonomy. | Confirmed |
+| 17 | **Token usage explains the inversion and reverses the cost story.** Identical 62-token prompt. `gpt-5-mini` emitted **3,000 output tokens — 376 visible + 2,624 hidden `reasoningTokens`**. `gpt-5.2` emitted **379, all visible, `reasoningTokens: 0`**. The "fast, cheap" model spent **7.9× more output tokens** on the same task. Break-even: `gpt-5-mini` is the cheaper choice only if its output price is under **12.6%** of `gpt-5.2`'s — i.e. `gpt-5.2` must cost **more than 7.9×** per token. **Price per token is not cost. Cost is price × tokens actually spent**, and reasoning tokens are invisible until you log `result.usage`. The course never mentions them. | Confirmed |
+| 18 | **Same model, same prompt, different recommendation.** Across runs `gpt-5-mini` enumerated all three valid solutions every time, but recommended **13 teams** in one run and **17 teams** in the next, with different justifications ("largest allowed team sizes" vs "smallest variance around the average"). Lesson 1's *"probabilistic, not deterministic"* made concrete — a product built on this hands users different advice on different days. `gpt-5.2` was stable across runs: same answer, and the same blind spot (only ever considering 11 and 12). | Confirmed |
 
 ### Side note: measurement errors of our own
 
@@ -73,6 +79,14 @@ verified and must not be treated as fact.
 - Predicted that CoT would help the older model more than the newer one.
   **Wrong** — the older model did not engage with the prompt at all
   (Finding 8), so the hypothesis could not be tested.
+- Predicted that the AI Gateway **API** would reject `openai/gpt-5-mini` because
+  the playground did. **Wrong** — the API accepted it on the first call
+  (Finding 3). Two different permission systems.
+- Suspected `gpt-5.2` had answered incorrectly, based on a 200-character
+  truncated preview that opened with *"the best equal-size option is 9"*.
+  **Wrong** — the full output showed it was setting up a divisibility check and
+  correctly ruled 9 out. *Lesson: never judge a model's answer from a truncated
+  preview; print the whole thing before concluding.*
 
 ---
 
@@ -130,6 +144,35 @@ Challenge 2 (model swap to `openai/gpt-5`) not run.
 ambiguous one, because the corrected version is the one backed by evidence here.
 
 **Produced Finding 12.**
+
+### 5 — Model Types and Performance · ✅
+Built `model-comparison.ts` at the repo root. The lesson's thesis is *fast models
+vs reasoning models*. **Every axis measured came out against it.**
+
+| | `gpt-5-mini` ("fast") | `gpt-5.2` ("reasoning") |
+|---|---|---|
+| Run 1 / 2 / 3 | 31,523 / 38,077 / 42,005 ms | 6,071 / 5,982 / 7,387 ms |
+| Latency variance | ~21% | ~1.5% |
+| Output tokens | **3,000** (376 text + 2,624 reasoning) | **379** (379 text + 0 reasoning) |
+| Correct | ✅ | ✅ |
+| Solutions found | 3 of 3 | 1 of 3 |
+| Stable across runs | ❌ changed its recommendation | ✅ |
+
+Deviations from the course: `dotenv-flow` instead of `dotenv/config`
+(Finding 13); full output instead of 200-char previews; added `result.usage`
+logging, which is what surfaced Finding 17.
+
+**Produced Findings 13, 14, 15, 16, 17, 18.**
+
+**Conclusion, against the lesson:** the fast/reasoning taxonomy no longer
+describes these models. Both reason; they differ in *how many hidden tokens they
+burn to get there*. The decision framework worth keeping is not "fast model vs
+reasoning model" but **measure `usage` and latency on your own task**, because
+neither is predictable from the label or the per-token price.
+
+Open question, not chased: `outputTokens` was exactly **3,000** for
+`gpt-5-mini` (376 + 2,624). A suspiciously round number — possibly a cap.
+Logging `result.finishReason` (`stop` vs `length`) would settle it.
 
 ---
 
