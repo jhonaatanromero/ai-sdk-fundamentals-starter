@@ -9,7 +9,7 @@ type SummaryCardProps = {
   headline: string;
   context: string;
   discussionPoints: string;
-  takeaways: string;
+  takeaways: string[];
 };
 
 export function SummaryCard({
@@ -25,7 +25,9 @@ export function SummaryCard({
         <ul className="list-disc space-y-2 pl-5 text-sm">
           <li>{context}</li>
           <li>{discussionPoints}</li>
-          <li>{takeaways}</li>
+          {takeaways.map((item, i) => (
+            <li key={i}>{item}</li>
+          ))}
         </ul>
       </CardContent>
     </Card>

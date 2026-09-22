@@ -82,6 +82,10 @@ verified and must not be treated as fact.
 | 29 | **An undefined criterion gets filled with the model's own, and the output does not say which one.** The course's `urgency` field carries only `.describe('How urgently this request needs a response')` — it never defines what makes something urgent. Distribution came out 2 high / 4 medium / 1 low, so the model did use the full range (the "everything lands on medium" prediction was only half right). But look at *which* criterion it chose: it ranked **user distress**, not business value. Tickets 4 and 7 are both **inbound sales enquiries** — arguably the highest-value rows in the set — and landed `medium` and `low`. Meanwhile *"I'm having trouble cancelling my account"*, a customer actively leaving, landed `high`. A routing system built on this would put the sales queue below a churning user. **The `.describe()` is not documentation — it is where business logic gets defined**, and leaving it vague does not produce a neutral result, it produces someone else's. | Confirmed |
 | 30 | **Defining the criterion worked surgically — and exposed that errors compound across fields.** Rewriting only the `urgency` `.describe()` to state the business rule (*"high = blocked, at risk of churning, OR an inbound sales opportunity"*) moved **exactly one row**: ticket 4, enterprise pricing, `medium` → `high`. Every other row was unchanged. **But ticket 7 — equally an inbound sales enquiry (self-hosted is an enterprise offering) — stayed `low`**, because the model had filed it as `product_issues` rather than `enterprise_sales`. From that category it is a support question, not a lead. **The earlier misclassification propagated into a second field.** This is the real hazard of extracting many fields in one call: one wrong field poisons the others, and the result is a perfectly valid object with two wrong values sharing a single root cause. Ticket 7 was flagged as debatable back in Finding 26; that unresolved doubt has now cost a second field. | Confirmed |
 | 31 | **Classification held identical across five languages, including two non-Latin scripts.** `support_requests_multilanguage.json` is the same 7 tickets translated (German, Spanish, Chinese, Japanese, Italian), same order and ids — a clean control for meaning-held-constant. **All 7 rows returned the same `category` and `urgency` as the English run**, and `language` was identified correctly in all 7. The bet that Chinese and Japanese would drift was **wrong**. Practical consequence: **no translation step is needed ahead of classification** — no extra call, latency or cost in a multilingual support pipeline. Notably **ticket 7's error replicated identically in Spanish**, so the misclassification lives in the semantics, not the language, and can be fixed once instead of per-locale — a bias that appeared only in Japanese would be far worse, because nobody would see it. **Limit:** 7 tickets, one run, no human-written ground truth. A clean signal, not an evaluation. | Confirmed |
+| 32 | **Measured: `POST /summarization 200 in 10176ms`** — 10.2 s for one summary of 20 comments, against `GET` requests of 116–267 ms on the same page. **97% of the wait is the model call.** Predicted 5–20 s. 10 s is the classic threshold at which users stop waiting and switch tasks, and the UI offers nothing but a button reading "Summarizing…" — no progress, no partial output. This is the concrete argument for streaming (Lesson 11): it does not make the response faster, it makes it *look alive* from the first token. | Confirmed |
+| 33 | **Confirmed: the `.describe()` instruction is what makes the summary actionable.** `takeaways` carries `'**Include names** for assigned tasks'`, and the output assigned work to Liam, Sophia, Emma and James by name. Without it the summary would read *"someone will prepare the slides"* — accurate and useless. The business requirement lives in the schema, not the prompt. | Confirmed |
+| 34 | **The course's own summary card renders correct data incorrectly, because three layers disagree.** `takeaways` is declared `z.string()`, its `.describe()` asks for *"2-3 **bullet points**"*, and `summary-card.tsx` renders `<li>{takeaways}</li>` — a single list item. The model complied and emitted dashes; they render as literal `-` characters mid-paragraph. **A `z.string()` holding markdown is a type lying about its contents.** Fix: `z.array(z.string())` plus `.map()` in the component — and because `type Summary = Awaited<ReturnType<typeof generateSummary>>`, TypeScript flags the component *before* the code runs. Rule: **if the `.describe()` asks for a list, the schema must be a list.** | Confirmed |
+| 35 | **A Server Action is a public HTTP endpoint, and the course treats it as a private function.** The dev log shows it plainly: `POST /summarization`. `generateSummary(comments: any[])` takes **unvalidated input straight into an LLM prompt** — no schema, no size limit, no shape check. Anyone who can reach the page can POST arbitrary content: unbounded input (burns credits), and prompt injection inside any `content` field. Harmless in this exercise, where the client sends a static JSON file — **but this is the pattern people copy into production**. The course teaches validating what comes **out** of the model and says nothing about validating what goes **in**. | Confirmed |
 
 ### Side note: measurement errors of our own
 
@@ -214,6 +218,28 @@ the multilingual file. Four experiments, each changing one variable:
 
 ---
 
+
+
+### 8 — Automatic Summarization · ✅
+First web lesson. Created `actions.ts` as a Server Action (`'use server'`) and
+wired the button in `page.tsx`. 20 comments in, one structured summary out.
+
+- `'use server'` is why the API key never reaches the browser — the architectural
+  reason every previous lesson was CLI-only.
+- No `dotenv-flow` here: Next.js loads `.env.local` for server code by itself.
+- Measured 10,176 ms then 8,282 ms per summary, against 44–267 ms page loads.
+- Fixed the course's `takeaways` field from `z.string()` to `z.array(z.string())`
+  and updated `summary-card.tsx` to `.map()` over it. Changing the Zod schema
+  raised a TypeScript error in the React component **before running anything** —
+  the payoff of `type Summary = Awaited<ReturnType<typeof generateSummary>>`.
+- Side observation, not established: after the array change each takeaway carried
+  **full** names ("Liam Johnson") where the single-string version used first names
+  only. Plausibly because one string per item leaves room to be self-contained,
+  but a single run and non-determinism (Findings 18, 24) make this unproven.
+- `headline` differed across runs — "Proceed to Next Phase" then "Client Call
+  Prep". Both valid; same non-determinism as Finding 18.
+
+**Produced Findings 32, 33, 34, 35.**
 ## Security ledger
 
 | Item | Status |
