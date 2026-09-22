@@ -75,6 +75,13 @@ verified and must not be treated as fact.
 | 22 | **The transparency fix works — and its value is that nothing visible changed.** Adding `dateWasInferred: z.boolean()` plus an explicit *"Today is Tuesday, 2026-09-22"* inside the `date` field's own `.describe()` produced the **same** date, `2026-09-29`, now flagged `⚠️ Date was inferred`. The output is identical; **the reason it is correct moved from an undocumented provider injection into this project's own source**. That is the entire point: a change that alters no output and makes the system maintainable and testable. Caveat stated before the run and held after it: the model flagged an **obvious** inference. This does **not** establish that it is well calibrated on subtle ones, and one success is not evidence of reliability. | Confirmed |
 | 23 | **The `secondBestCategory` ambiguity signal does not work as designed.** Control run on an unmistakable newsletter returned `secondBestCategory: "fyi"` instead of `null`. **2 of 2 emails produced a non-null second category — the field never abstains**, so the `⚠️ ambiguous` warning fires 100% of the time and is useless as a boolean gate. The prediction that the control would return `null` was **wrong**. But the *content* of the pair is still informative: `urgent ↔ action-required` are two categories that would route an email differently in a real system; `newsletter ↔ fyi` are two that would not. **The usable signal is not "is there a second choice?" but "would the second choice change what my system does?"** | Confirmed — technique refuted as designed |
 | 24 | **The same email classified differently across two runs**, and this is the strongest evidence in the log for Finding 18. Identical input, model and schema. Run 1: `category: action-required`, `secondBest: urgent`, `estimatedResponseTime: under-30-min`. Run 2: **`category: urgent`, `secondBest: action-required`**, `estimatedResponseTime: under-5-min`. **Primary and secondary swapped places.** If `urgent` fires a push notification and `action-required` files a task, the same email reaches the user differently on different days. The flip also *proves the tie was real* — the model is not choosing, it is coin-flipping. **Running a classification twice and checking for a flip is a more honest ambiguity detector than asking the model to self-report one** — and far more expensive, which is the real trade-off nobody mentions. | Confirmed |
+| 25 | **The Lesson 7 scaffold dictates an API that does not exist in v7.** Its TODO says `Output.object({ schema: yourSchema, mode: 'array' })`. Verified against `ai@7.0.4` type declarations: `Output.object` accepts only `{ schema, name, description }` — **there is no `mode`** — and the array form is `Output.array({ element, ... })`, whose parameter is **`element`, not `schema`**. The lesson prose says `Output.array()`, so **the scaffold and the lesson contradict each other and the scaffold is the stale one**. Same residue as Finding 10: the v7 branch bumped dependencies and never updated scaffold comments. | Confirmed |
+| 26 | **A category with no true members attracted a false positive; removing it fixed the row and the output became stable.** Only 3 of the 5 enum categories have genuine members in `support_requests.json`. With all 5 offered, ticket 7 was classified `product_feedback` — wrong (Finding 27). With `billing` and `product_feedback` commented out and **nothing else changed**, ticket 7 became `product_issues` — defensible rather than wrong, though `enterprise_sales` still reads better — and **three consecutive runs returned byte-identical output for all 7 rows**. Practical rule: **do not offer categories your real data does not use**; each unused slot is an invitation to misfile. **Stated limit:** the 5-category configuration was only run once, so the enum reduction is not shown to have *caused* the stability — only that the 3-category configuration is stable. | Supported: 3/3 stable |
+| 27 | **A clearly wrong classification passed every check the course teaches.** Ticket 7 — *"Do you offer technical support for self-hosted installations?"* — a pre-sales support question, was classified `product_feedback`. It is not feedback under any reading. `z.enum` validated it, TypeScript accepted it, nothing threw. A real routing system would file a self-hosted sales enquiry into the product-feedback queue, where it dies. **6 of 7 correct = 86% accuracy with no signal for which one is wrong** — so a human must read all 7, which is exactly the work the feature was meant to remove. **An accurate classifier without a confidence signal saves nothing.** This is the strongest single argument in the whole log for evaluation sets, and the course does not mention them. | Confirmed |
+| 28 | The `request: z.string()` echo was **faithful in all 7 rows** — byte-identical to the input JSON. The design smell stands regardless: the schema pays output tokens to re-emit text the model already received, and uses free-form text as the join key back to the source data when the file already provides an `id`. Faithful today is not a guarantee. | Confirmed |
+| 29 | **An undefined criterion gets filled with the model's own, and the output does not say which one.** The course's `urgency` field carries only `.describe('How urgently this request needs a response')` — it never defines what makes something urgent. Distribution came out 2 high / 4 medium / 1 low, so the model did use the full range (the "everything lands on medium" prediction was only half right). But look at *which* criterion it chose: it ranked **user distress**, not business value. Tickets 4 and 7 are both **inbound sales enquiries** — arguably the highest-value rows in the set — and landed `medium` and `low`. Meanwhile *"I'm having trouble cancelling my account"*, a customer actively leaving, landed `high`. A routing system built on this would put the sales queue below a churning user. **The `.describe()` is not documentation — it is where business logic gets defined**, and leaving it vague does not produce a neutral result, it produces someone else's. | Confirmed |
+| 30 | **Defining the criterion worked surgically — and exposed that errors compound across fields.** Rewriting only the `urgency` `.describe()` to state the business rule (*"high = blocked, at risk of churning, OR an inbound sales opportunity"*) moved **exactly one row**: ticket 4, enterprise pricing, `medium` → `high`. Every other row was unchanged. **But ticket 7 — equally an inbound sales enquiry (self-hosted is an enterprise offering) — stayed `low`**, because the model had filed it as `product_issues` rather than `enterprise_sales`. From that category it is a support question, not a lead. **The earlier misclassification propagated into a second field.** This is the real hazard of extracting many fields in one call: one wrong field poisons the others, and the result is a perfectly valid object with two wrong values sharing a single root cause. Ticket 7 was flagged as debatable back in Finding 26; that unresolved doubt has now cost a second field. | Confirmed |
+| 31 | **Classification held identical across five languages, including two non-Latin scripts.** `support_requests_multilanguage.json` is the same 7 tickets translated (German, Spanish, Chinese, Japanese, Italian), same order and ids — a clean control for meaning-held-constant. **All 7 rows returned the same `category` and `urgency` as the English run**, and `language` was identified correctly in all 7. The bet that Chinese and Japanese would drift was **wrong**. Practical consequence: **no translation step is needed ahead of classification** — no extra call, latency or cost in a multilingual support pipeline. Notably **ticket 7's error replicated identically in Spanish**, so the misclassification lives in the semantics, not the language, and can be fixed once instead of per-locale — a bias that appeared only in Japanese would be far worse, because nobody would see it. **Limit:** 7 tickets, one run, no human-written ground truth. A clean signal, not an evaluation. | Confirmed |
 
 ### Side note: measurement errors of our own
 
@@ -115,7 +122,7 @@ panels. Exercise 3 (schema) **skipped** — deferred to Lesson 4 where it is don
 in real code.
 **Produced Findings 6, 7, 8, 9.**
 
-### 3 — AI SDK Dev Setup · in progress
+### 3 — AI SDK Dev Setup · ✅
 Forked, cloned, fast-forwarded to AI SDK v7, installed, approved 4 native build
 scripts, configured `.env.local` with an AI Gateway API key, `env-check.ts`
 passed.
@@ -183,6 +190,27 @@ neither is predictable from the label or the per-token price.
 Open question, not chased: `outputTokens` was exactly **3,000** for
 `gpt-5-mini` (376 + 2,624). A suspiciously round number — possibly a cap.
 Logging `result.finishReason` (`stop` vs `length`) would settle it.
+
+
+### 6 — Introduction to Invisible AI · ✅
+`Output.object()` with Zod. Implemented `test-structured.ts` (text vs structured
+comparison) and both functions in `invisible-ai-demo.ts`. Beyond the course:
+`dateWasInferred` and `secondBestCategory` fields to surface uncertainty, plus an
+explicit today's-date in a `.describe()`. The `secondBestCategory` idea was
+**refuted by its own control run**.
+**Produced Findings 19-24.**
+
+### 7 — Text Classification · ✅
+`Output.array({ element })` over `support_requests.json`, then `urgency`, then
+the multilingual file. Four experiments, each changing one variable:
+
+1. Baseline, 5 categories → ticket 7 misclassified as `product_feedback`.
+2. Dropped the 2 unused categories → ticket 7 became defensible; 3/3 runs stable.
+3. Defined the business criterion in `urgency`'s `.describe()` → moved exactly
+   one row (ticket 4, `medium` → `high`) and exposed error compounding.
+4. Switched to the multilingual file → all 7 rows identical to English.
+
+**Produced Findings 25-31.**
 
 ---
 
