@@ -90,6 +90,8 @@ verified and must not be treated as fact.
 | 40 | **Supplying today's date does not stabilise a relative date, and the hypothesis that it did was wrong.** Same input, same code, `.describe()` carrying *"Today is Tuesday, 2026-09-22"*: run 1 returned `2026-10-02`, run 2 returned `2026-09-25` — **a week apart**. The initial reading, that the explicit date caused a considered shift to next week's Friday, was **refuted by one repeat run**. It simply coin-flips. **Giving the model today's date fixes what it *knows*; it does not fix how it *interprets* "next Friday".** Those are two different problems and only the first is a `.describe()`'s job. **There is no correct answer to pin**, because the phrase is ambiguous to humans too — so no amount of prompt engineering stabilises it. The only remaining fix is the one improvised in Lesson 6: a `dateWasInferred` flag and a confirmation step. **Do not guess better; admit you are guessing.** | Confirmed (hypothesis refuted) |
 | 41 | **A precise prompt to v0 produced zero integration work.** The prompt carried the exact TypeScript interface, *"one row per array element"*, *"do not add any dependency beyond shadcn/ui and lucide-react"* and *"render only from its props, no hardcoded sample data"* — **each constraint written from a defect already recorded in this log** (34, and v0's habit of inlining demo data). The generated component honoured all of them, so swapping it in changed **exactly one line**, the import; `<SummaryCard {...summary} />` was untouched and `tsc --noEmit` passed. Had the prompt been vague and v0 invented its own prop names, the same swap would have needed an adapter. **Prompting a generator is the same discipline as prompting a model: the constraints worth writing are the ones that close the doors it would otherwise walk through.** | Confirmed |
 | 42 | **The lesson prescribes dependencies for a component that does not exist yet.** It instructs `shadcn add card`, `shadcn add badge` and `pnpm add lucide-react`. `card` and `lucide-react` were **already in the repo**, and the generated component used lucide icons rather than `Badge`, so `badge` was installed and never used. **What you need to install depends on what v0 generates, which is unknowable before you prompt.** | Confirmed |
+| 43 | **Streaming confirmed: the first token arrives immediately and the wait disappears.** Same account, same model (`openai/gpt-5-mini`), but a route handler with `streamText` + `toUIMessageStream` instead of a Server Action with `generateText`. Compared with Finding 32's measured 10.2 s of a frozen button, the chat starts rendering in well under a second and fills in word by word. **Total time is probably similar; what is removed is the interval in which the user cannot tell whether anything is happening.** Note the architectural reason for the change: a Server Action returns a value and ends, so it cannot stream — only a route handler returns a `Response` that stays open. | Confirmed |
+| 44 | **The hardcoded date went stale in 24 hours, unprompted.** `app/(4-extraction)/extraction/schemas.ts` carries `'Today is Tuesday, 2026-09-22.'` inside a `.describe()`, written on 2026-09-22. By 2026-09-23 it was simply wrong, with nobody touching the file. This is the maintenance cost described in Findings 19 and 40, arriving on its own overnight. Correct fix: inject at runtime, `` `... Today is ${new Date().toDateString()}. ...` ``. **Not yet applied** — recorded so it is not forgotten. | **Open** — fix pending |
 | 33 | **Confirmed: the `.describe()` instruction is what makes the summary actionable.** `takeaways` carries `'**Include names** for assigned tasks'`, and the output assigned work to Liam, Sophia, Emma and James by name. Without it the summary would read *"someone will prepare the slides"* — accurate and useless. The business requirement lives in the schema, not the prompt. | Confirmed |
 | 34 | **The course's own summary card renders correct data incorrectly, because three layers disagree.** `takeaways` is declared `z.string()`, its `.describe()` asks for *"2-3 **bullet points**"*, and `summary-card.tsx` renders `<li>{takeaways}</li>` — a single list item. The model complied and emitted dashes; they render as literal `-` characters mid-paragraph. **A `z.string()` holding markdown is a type lying about its contents.** Fix: `z.array(z.string())` plus `.map()` in the component — and because `type Summary = Awaited<ReturnType<typeof generateSummary>>`, TypeScript flags the component *before* the code runs. Rule: **if the `.describe()` asks for a list, the schema must be a list.** | Confirmed |
 | 35 | **A Server Action is a public HTTP endpoint, and the course treats it as a private function.** The dev log shows it plainly: `POST /summarization`. `generateSummary(comments: any[])` takes **unvalidated input straight into an LLM prompt** — no schema, no size limit, no shape check. Anyone who can reach the page can POST arbitrary content: unbounded input (burns credits), and prompt injection inside any `content` field. Harmless in this exercise, where the client sends a static JSON file — **but this is the pattern people copy into production**. The course teaches validating what comes **out** of the model and says nothing about validating what goes **in**. | Confirmed |
@@ -285,17 +287,28 @@ Division of labour: the prompt was written by hand, the plumbing (installing
 
 ---
 
-## Paused here
 
-Stopped after Lesson 10 on **2026-09-22**. 10 of 16 done, 42 findings, nothing
-uncommitted and no open findings.
+### 11 — Basic Chatbot · ✅
+First streaming lesson. Created `app/api/chat/route.ts` and replaced the
+three-line stub at `app/(5-chatbot)/chat/page.tsx`.
 
-**Resume at Lesson 11 — Basic Chatbot**: streaming, the `useChat` hook from
-`@ai-sdk/react`, and a route handler instead of a Server Action. It is the lesson
-that answers Finding 32 — the 10 seconds spent staring at a button.
+- **Route handler, not Server Action.** A Server Action returns a value and ends;
+  streaming needs a `Response` that stays open. That is the whole reason for the
+  architectural switch.
+- `streamText` is called **without `await`** — it returns immediately with a
+  stream that fills in, the opposite of `generateText`.
+- The course's route code is **correctly written for v7**: verified against the
+  `ai@7.0.4` declarations that `createUIMessageStreamResponse`, `toUIMessageStream`,
+  `convertToModelMessages` and `streamText` all exist and are exported, and that
+  the result-object methods `toUIMessageStream()` / `toUIMessageStreamResponse()`
+  are marked `@deprecated` in favour of the standalone helper the lesson uses.
+  A welcome contrast with Finding 25.
+- `message.parts` is an **array of typed parts**, not a string. Only `text` parts
+  are rendered today; tool-call parts arrive in Lessons 14-15. The scaffold is
+  already shaped for tools.
+- `tsc --noEmit` clean, worked first try.
 
-On resuming: `pnpm install` if anything looks stale, then
-`pnpm tsx env-check.ts` to confirm the API key is still live.
+**Produced Findings 43, 44.**
 ## Security ledger
 
 | Item | Status |
