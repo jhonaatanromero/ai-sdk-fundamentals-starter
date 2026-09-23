@@ -19,6 +19,8 @@ import {
   ToolInput,
   ToolOutput,
 } from "@/components/ai-elements/tool";
+import Weather from "./weather";
+import type { ChatMessage } from "@/app/api/chat/tools";
 import {
   PromptInput,
   PromptInputTextarea,
@@ -27,7 +29,7 @@ import {
 
 export default function Chat() {
   const [input, setInput] = useState("");
-  const { messages, sendMessage, status } = useChat();
+  const { messages, sendMessage, status } = useChat<ChatMessage>();
   const isLoading = status === "streaming" || status === "submitted";
 
   return (
@@ -53,6 +55,14 @@ export default function Chat() {
                             </MessageResponse>
                           );
                         case "tool-getWeather":
+                          if (part.state === "output-available" && part.output) {
+                            return (
+                              <Weather
+                                key={part.toolCallId || `${message.id}-${i}`}
+                                weatherData={part.output}
+                              />
+                            );
+                          }
                           return (
                             <Tool key={part.toolCallId || `${message.id}-${i}`}>
                               <ToolHeader type={part.type} state={part.state} />

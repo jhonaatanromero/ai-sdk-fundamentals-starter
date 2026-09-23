@@ -1,4 +1,5 @@
 import { tool } from 'ai';
+import type { InferUITools, UIDataTypes, UIMessage } from 'ai';
 import { z } from 'zod';
 
 export const getWeather = tool({
@@ -26,15 +27,21 @@ export const getWeather = tool({
     const response = await fetch(
       `https://api.open-meteo.com/v1/forecast?` +
         `latitude=${coords.lat}&longitude=${coords.lon}&` +
-        `current=temperature_2m,weathercode&timezone=auto`
+        `current=temperature_2m,relative_humidity_2m,weathercode&timezone=auto`
     );
 
     const weatherData = await response.json();
 
     return {
       city,
-      temperature: weatherData.current.temperature_2m,
-      weatherCode: weatherData.current.weathercode,
+      temperature: weatherData.current.temperature_2m as number,
+      weatherCode: weatherData.current.weathercode as number,
+      humidity: weatherData.current.relative_humidity_2m as number,
     };
   },
 });
+
+export const tools = { getWeather };
+
+export type ChatTools = InferUITools<typeof tools>;
+export type ChatMessage = UIMessage<never, UIDataTypes, ChatTools>;

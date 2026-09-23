@@ -3,6 +3,7 @@ import {
     convertToModelMessages,
     createUIMessageStreamResponse,
     toUIMessageStream,
+    isStepCount,
 } from 'ai';
 import { getWeather } from './tools';
 
@@ -21,9 +22,12 @@ Only answer questions about TechCorp's cloud platform: deployment issues, API us
 
 If the user asks about anything else - even if you know the answer perfectly well - do NOT answer it. Politely say it is outside TechCorp support and redirect them to contact@techcorp.com.
 
+When using tools, only mention capabilities you actually have. The weather tool provides current temperature and conditions only - no forecasts.
+
 Keep every answer under 150 words unless the user explicitly asks for more detail. Link to docs.techcorp.com when relevant.`,
             messages: await convertToModelMessages(messages),
             tools: { getWeather },
+            stopWhen: isStepCount(5),
         });
 
         return createUIMessageStreamResponse({
