@@ -1,7 +1,7 @@
 "use client";
 
 import { MessageList } from "./message-list";
-import { SummaryCard } from "./summary-card";
+import { SummaryCard } from "@/components/SummaryCard";
 import { Button } from "@/components/ui/button";
 import messages from "./messages.json";
 import { useState } from "react";
