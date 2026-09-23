@@ -404,6 +404,45 @@ completed tool calls client-side.
   (Finding 62).
 
 **Produced Findings 60, 61, 62.**
+
+### 16 — Conclusion · ✅
+No code. The course summarises five patterns: structured extraction, streaming
+interfaces, tool orchestration, component systems, multi-step workflows.
+
+---
+
+## What the course taught vs. what the findings taught
+
+The course teaches **how**. These 62 findings are what happened when we ran it.
+
+| The course's lesson | What measuring it added |
+|---|---|
+| Use `Output.object()` for structured data | **A schema guarantees shape, never judgement** (12, 21, 27, 37). It converts a visible failure into an invisible one. |
+| Write a good `.describe()` | **When a constraint fails, read the predicate before blaming the model** (49, 52). A paella recipe got through because the rule said "outside your knowledge area" instead of "outside our product". |
+| LLM output is probabilistic | **The same input reclassified differently across runs** (18, 24, 40). Primary and secondary categories swapped places; a relative date moved a week. |
+| Classification automates triage | **86% accuracy with no confidence signal saves no work** (27), because a human still has to read all of it to find the wrong one. |
+| Guard against model hallucination | **Your own code fabricates data too** (38, 54, 58, 62). A React component invented email addresses; a `||` fallback served New York's weather as Madrid's. |
+| Pick a fast, cheap model | **Price per token is not cost** (17). The "fast, cheap" model burned 2,624 hidden reasoning tokens against the expensive one's zero, and ran 5-6x slower (14). |
+| Add a system prompt | **It is not a security boundary** (51, 55). It refused to repeat itself verbatim and then paraphrased the whole thing. |
+| Ship a polished UI | **Visual polish validates nothing** (62). Three identical-looking weather cards; one was wrong by 3.6 °C. |
+
+### On the course itself
+Seven findings are defects that cost real time: the repo shipped **v6 while the
+prose taught v7** (10), scripts that **cannot run on Windows** (11), a
+`dotenv/config` that **never reads `.env.local`** (13), scaffolds citing **APIs
+that do not exist in v7** (25, and again in Lessons 14 and 15), a schema
+contradicting its own UI (34), and a one-line install that **breaks the build**
+(45). None are mentioned anywhere in the course.
+
+### On the method
+**11 predictions were refuted**, most of them mine. The refutations taught more
+than the confirmations: that the API is not gated like the playground (3), that
+the baseline needed no `.describe()` at all (36), that a word *ceiling* is
+honoured where a word *target* is not (53), that the ambiguity self-report never
+abstains (23), and that supplying today's date does not stabilise "next Friday"
+(40). Every one of them is recorded, including the reasoning that was wrong.
+
+**Nothing in this log was adjusted to make a result look better.**
 ## Security ledger
 
 | Item | Status |
