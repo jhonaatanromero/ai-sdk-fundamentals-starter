@@ -267,6 +267,35 @@ fixed only what actually broke.
 Three predictions in this lesson, **two refuted** (36, 40) and one confirmed (39).
 
 **Produced Findings 36, 37, 38, 39, 40.**
+
+### 10 — UI with v0 · ✅
+Generated a `SummaryCard` in v0 and swapped it in for the hand-written one.
+Division of labour: the prompt was written by hand, the plumbing (installing
+`badge`, creating the file, rewiring the import) was mechanical.
+
+- The prompt carried the exact TypeScript interface plus constraints drawn from
+  earlier findings. Result: **one line changed** in `page.tsx` and `tsc --noEmit`
+  passed with `<SummaryCard {...summary} />` untouched (Finding 41).
+- `badge` was installed on the lesson's instruction and never used (Finding 42).
+- **Finding 4 resolved**: v0 needs a login, not a paid plan.
+- Deleted `app/(3-summarization)/summarization/summary-card.tsx`, now unreferenced.
+  It remains in history at commit `d4bcada`.
+
+**Produced Findings 41, 42. Resolved Finding 4.**
+
+---
+
+## Paused here
+
+Stopped after Lesson 10 on **2026-09-22**. 10 of 16 done, 42 findings, nothing
+uncommitted and no open findings.
+
+**Resume at Lesson 11 — Basic Chatbot**: streaming, the `useChat` hook from
+`@ai-sdk/react`, and a route handler instead of a Server Action. It is the lesson
+that answers Finding 32 — the 10 seconds spent staring at a button.
+
+On resuming: `pnpm install` if anything looks stale, then
+`pnpm tsx env-check.ts` to confirm the API key is still live.
 ## Security ledger
 
 | Item | Status |
