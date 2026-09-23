@@ -1,15 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import {  ClockIcon, MapPinIcon, UsersIcon } from "lucide-react"
+import { ClockIcon, MapPinIcon, UsersIcon } from "lucide-react"
 
 export interface AppointmentDetails {
   title: string
-  date: string
+  date: string | null
   startTime: string | null
   endTime: string | null
   location: string | null
   attendees: string[] | null
 }
+
 
 interface CalendarAppointmentProps {
   appointment: AppointmentDetails | null
@@ -33,11 +34,10 @@ export function CalendarAppointment({ appointment }: CalendarAppointmentProps) {
           label="Date & Time"
           value={
             appointment?.date
-              ? `${appointment.date}${
-                  appointment.startTime && appointment.endTime
-                    ? `, ${appointment.startTime} - ${appointment.endTime}`
-                    : ""
-                }`
+              ? `${appointment.date}${appointment.startTime && appointment.endTime
+                ? `, ${appointment.startTime} - ${appointment.endTime}`
+                : ""
+              }`
               : null
           }
           placeholder="No date or time set"
@@ -69,9 +69,6 @@ export function CalendarAppointment({ appointment }: CalendarAppointmentProps) {
                   </Avatar>
                   <div>
                     <p className="text-sm font-semibold">{attendee}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {attendee.toLowerCase().split(" ").join("_")}@company.com
-                    </p>
                   </div>
                 </div>
               ))}
